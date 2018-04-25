@@ -47,22 +47,11 @@ import org.springframework.beans.factory.config.ConstructorArgumentValues.ValueH
 import org.springframework.beans.factory.support.AbstractBeanDefinition;
 import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.cloud.function.context.FunctionCatalog;
-import org.springframework.cloud.function.context.FunctionRegistration;
-import org.springframework.cloud.function.context.FunctionRegistry;
-import org.springframework.cloud.function.context.FunctionScan;
-import org.springframework.cloud.function.context.FunctionType;
+import org.springframework.cloud.function.context.*;
 import org.springframework.cloud.function.context.catalog.FunctionInspector;
 import org.springframework.cloud.function.context.catalog.FunctionRegistrationEvent;
 import org.springframework.cloud.function.context.catalog.FunctionUnregistrationEvent;
-import org.springframework.cloud.function.core.FluxConsumer;
-import org.springframework.cloud.function.core.FluxFunction;
-import org.springframework.cloud.function.core.FluxSupplier;
-import org.springframework.cloud.function.core.FunctionFactoryMetadata;
-import org.springframework.cloud.function.core.FunctionFactoryUtils;
-import org.springframework.cloud.function.core.IsolatedConsumer;
-import org.springframework.cloud.function.core.IsolatedFunction;
-import org.springframework.cloud.function.core.IsolatedSupplier;
+import org.springframework.cloud.function.core.*;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -73,6 +62,7 @@ import org.springframework.core.type.StandardMethodMetadata;
 import org.springframework.core.type.classreading.MethodMetadataReadingVisitor;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ClassUtils;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.ReflectionUtils;
 import org.springframework.util.StringUtils;
 
@@ -186,6 +176,9 @@ public class ContextFunctionCatalogAutoConfiguration {
 		private ConfigurableListableBeanFactory registry;
 
 		private Map<Object, String> names = new ConcurrentHashMap<>();
+
+		@Autowired(required = false)
+		private NonReactiveTargetTypesProvider nonReactiveTargetTypesProvider;
 
 		private Map<String, FunctionType> types = new ConcurrentHashMap<>();
 
@@ -399,14 +392,26 @@ public class ContextFunctionCatalogAutoConfiguration {
 		private void wrap(FunctionRegistration<Object> registration, String key) {
 			Object target = registration.getTarget();
 			this.names.put(target, key);
-			if (registration.getType() != null) {
+			FunctionType registrationType = registration.getType();
+			if (registrationType != null) {
 				this.types.put(key, registration.getType());
 			}
 			else {
-				findType(target);
+				registrationType = findType(target);
 			}
 			Class<?> type;
-			target = target(target, key);
+			Set<Class<?>> nonReactiveTargetTypes = this.nonReactiveTargetTypesProvider.getNonReactiveTargetTypes();
+			boolean shouldWrap = true;
+			if (!CollectionUtils.isEmpty(nonReactiveTargetTypes)) {
+				//both input and output need to be non-reactive types to avoid wrapping.
+				if (nonReactiveTargetTypes.contains(registrationType.getInputType()) &&
+						nonReactiveTargetTypes.contains(registrationType.getOutputType())) {
+					shouldWrap = false;
+				}
+			}
+			if (shouldWrap) {
+				target = target(target, key);
+			}
 			registration.target(target);
 			if (target instanceof Supplier) {
 				type = Supplier.class;

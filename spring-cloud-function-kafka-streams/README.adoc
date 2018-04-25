@@ -1,0 +1,22 @@
+Steps to run the Kafka Streams function test. (The test is disabled by default)
+
+1. Go to the root of the repository: `./mvnw clean install` (-DskipTests)
+
+2. `cd spring-cloud-function-kafka-streams`
+
+3. `docker-compose up -d`
+
+4. `../mvnw clean package -DskipTests=false` +
+The test waits for 5 minutes so that we can verify the behavior.
+
+4. On another terminal: +
+`docker exec -it kafka-streams-fn /opt/kafka/bin/kafka-console-producer.sh --broker-list 127.0.0.1:9092 --topic foo`
+
+5. Split the same terminal window into two panes and on the second one: +
+`docker exec -it kafka-streams-fn /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server 127.0.0.1:9092 --topic bar`
+
+6. Enter some text in the first pane, it should count the frequency that it sees in 30 seconds time windows in the second pane.
+
+7. Test waits for 5 mins - ctrl+c if you want to exit before that.
+
+8. Go to spring-cloud-function-kafka-streams directory: `docker-compose down`
