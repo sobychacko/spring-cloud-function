@@ -43,9 +43,6 @@ public class XStreamListeningFunctionInvoker extends XAbstractStreamListeningInv
 		super(functionCatalog, functionInspector, converterFactory, defaultRoute, share);
 		this.functionCatalog = functionCatalog;
 		this.functionInspector = functionInspector;
-
-		Function<KStream, KStream> function = functionCatalog.lookup(Function.class, "foobar");
-		System.out.println("foo");
 	}
 
 	@StreamListener
